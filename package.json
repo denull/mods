@@ -1,11 +1,15 @@
 {
   "name": "mods",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "",
   "license": "MIT",
   "author": "Denis Olshin (me@denull.ru)",
   "type": "commonjs",
   "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/denull/mods.git"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   }

@@ -9,6 +9,9 @@ A powerful module management system for Node.js that provides dynamic loading, u
 - 🔥 Hot-reloading support
 - 📦 Module lifecycle management
 - 🧩 Context-aware module initialization
+- 📡 Event emitter capabilities for inter-module communication
+- ⏱️ Automatic timeout and interval management
+- 🧹 Automatic cleanup on process exit and error handling
 
 ## Installation
 
@@ -36,33 +39,65 @@ mods.autoload(ctx);
 
 ```javascript
 // Load a single module
-mods.load('moduleName', ctx);
+const module = await mods.load('moduleName', ctx);
 
 // Load multiple modules
-mods.load(['module1', 'module2'], ctx);
+const modules = await mods.load(['module1', 'module2'], ctx);
 ```
 
 ### Unloading Modules
 
 ```javascript
 // Unload a single module
-mods.unload('moduleName');
+await mods.unload('moduleName');
 
 // Unload multiple modules
-mods.unload(['module1', 'module2']);
+await mods.unload(['module1', 'module2']);
+
+// Unload all modules
+await mods.unload();
 ```
 
 ### Reloading Modules
 
 ```javascript
 // Reload a single module
-mods.reload('moduleName', ctx);
+await mods.reload('moduleName', ctx);
 
 // Reload multiple modules
-mods.reload(['module1', 'module2'], ctx);
+await mods.reload(['module1', 'module2'], ctx);
 
 // Reload all loaded modules
-mods.reload(null, ctx);
+await mods.reload(null, ctx);
+```
+
+### Module Communication
+
+```javascript
+// Inside a module
+this.emit('eventName', data);
+
+// Listen for events from other modules
+this.on('eventName', (data) => {
+  // Handle event
+});
+
+// Broadcast events to all modules
+this.broadcast('eventName', data);
+```
+
+### Timeout and Interval Management
+
+```javascript
+// Set a timeout that will be automatically cleared on unload
+this.setTimeout(() => {
+  // Your code
+}, 1000);
+
+// Set an interval that will be automatically cleared on unload
+this.setInterval(() => {
+  // Your code
+}, 1000);
 ```
 
 ## Module Structure
@@ -71,11 +106,11 @@ Modules should be placed in the `mods` directory and follow this structure:
 
 ```javascript
 // mods/example.js
-module.exports = (ctx) => {
+module.exports = function(ctx) {
   // Module initialization code
   
   // Return cleanup function
-  return () => {
+  return async () => {
     // Cleanup code
   };
 };
@@ -84,16 +119,12 @@ module.exports = (ctx) => {
 ## How It Works
 
 1. **Module Loading**: When a module is loaded, it receives a context object and returns a cleanup function.
-2. **Dependency Tracking**: The system automatically tracks which modules require which other modules.
-3. **Hot Reloading**: Modules can be reloaded without restarting the application.
-4. **Cleanup**: When unloading, the cleanup function is called to properly dispose of resources.
-
-## Best Practices
-
-1. Always return a cleanup function from your modules
-2. Use the provided context for module configuration
-3. Keep modules focused and single-purpose
-4. Handle cleanup properly to prevent memory leaks
+2. **Dependency Tracking**: The system automatically tracks module dependencies through a graph system.
+3. **Event System**: Modules can communicate through events using the built-in event emitter.
+4. **Resource Management**: Timeouts and intervals are automatically managed and cleaned up.
+5. **Hot Reloading**: Modules can be reloaded without restarting the application.
+6. **Cleanup**: When unloading, the cleanup function is called to properly dispose of resources.
+7. **Process Management**: Automatic cleanup on process exit and error handling.
 
 ## License
 

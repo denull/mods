@@ -1,10 +1,58 @@
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
+const EventEmitter = require('node:events');
 const originalRequire = Module.prototype.require;
 //const originalResolveFilename = Module._resolveFilename;
 
 const modsDir = path.resolve(process.cwd(), 'mods');
+
+class Mod extends EventEmitter {
+  constructor(mods, name, ctx) {
+    super();
+    this.mods = mods;
+    this.name = name;
+    this.ctx = ctx;
+    this.timeouts = [];
+    this.intervals = [];
+  }
+
+  broadcast(event, ...args) {
+    this.mods.forEach(mod => {
+      mod.emit(event, ...args);
+    });
+  }
+
+  setTimeout(fn, ms) {
+    const timeout = setTimeout(fn, ms);
+    this.timeouts.push(timeout);
+    return timeout;
+  }
+
+  setInterval(fn, ms) {
+    const interval = setInterval(fn, ms);
+    this.intervals.push(interval);
+    return interval;
+  }
+
+  clearTimeout(timeout) {
+    clearTimeout(timeout);
+    this.timeouts.splice(this.timeouts.indexOf(timeout), 1);
+  }
+
+  clearInterval(interval) {
+    clearInterval(interval);
+    this.intervals.splice(this.intervals.indexOf(interval), 1);
+  }
+
+  async unload(isReloading = false) {
+    this.emit('beforeUnload', isReloading);
+    this.removeAllListeners();
+    this.timeouts.forEach(timeout => clearTimeout(timeout));
+    this.intervals.forEach(interval => clearInterval(interval));
+    this.beforeUnload && await this.beforeUnload();
+  }
+}
 
 class Mods {
   constructor() {
@@ -19,25 +67,35 @@ class Mods {
 
   async load(name, ctx) {
     if (Array.isArray(name)) {
-      await Promise.all(name.map(mod => this.load(mod)));
-      return;
+      return Promise.all(name.map(mod => this.load(mod)));
     }
-    const mod = originalRequire(`${modsDir}/${name}`);
-    this.loaded[name] = await mod(ctx);
+    const load = originalRequire(`${modsDir}/${name}`);
+    const mod = new Mod(this.loaded, name, ctx);
+    this.loaded[name] = mod;
+    mod.beforeUnload = load.call(mod, ctx); // We need to set the beforeUnload even before loading is complete (so the unload can work correctly)
+    await mod.beforeUnload;
+    return mod;
   }
 
-  async unload(name) {
-    if (Array.isArray(name)) {
-      await Promise.all(name.map(mod => this.unload(mod)));
+  async unload(name, isReloading = false) {
+    if (!name) {
+      Object.keys(this.loaded).forEach(mod => this.unload(mod, isReloading));
       return;
     }
-    this.loaded[name] && await this.loaded[name]();
+    if (Array.isArray(name)) {
+      await Promise.all(name.map(mod => this.unload(mod, isReloading)));
+      return;
+    }
+    if (!this.loaded[name]) {
+      return;
+    }
+    await this.loaded[name].unload(isReloading);
     delete this.loaded[name];
   }
 
   uncache(name) {
     const filename = require.resolve(name, {
-      paths: [process.cwd()]
+      paths: [modsDir]
     });
     delete require.cache[filename];
     if (this.graph[filename]) {
@@ -56,7 +114,7 @@ class Mods {
       await Promise.all(name.map(mod => this.reload(mod, ctx)));
       return;
     }
-    await this.unload(name);
+    await this.unload(name, true);
     this.uncache(`${modsDir}/${name}`);
     await this.load(name, ctx);
   }
@@ -81,5 +139,37 @@ Module.prototype.require = function(path) {
 
   return resolvedPath;
 };*/
+
+// Handle process exit events
+const exitSignals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+let isExiting = false;
+
+const cleanup = async () => {
+  if (isExiting) return;
+  isExiting = true;
+  
+  try {
+    await mods.unload();
+  } catch (error) {
+    console.error('Error during module cleanup:', error);
+  } finally {
+    process.exit(0);
+  }
+};
+
+exitSignals.forEach(signal => {
+  process.on(signal, cleanup);
+});
+
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', async (error) => {
+  console.error('Uncaught Exception:', error);
+  await cleanup();
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  await cleanup();
+});
 
 module.exports = mods;
