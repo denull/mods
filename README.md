@@ -90,7 +90,7 @@ this.broadcast('eventName', data);
 
 ### Timeout and Interval Management
 
-There is also a wrappers for `setTimeout` and `setInterval` which are automatically cleared on module unload.
+There are also wrappers for `setTimeout` and `setInterval` functions which are automatically cleared on module unload.
 
 ```javascript
 // Set a timeout that will be automatically cleared on unload
