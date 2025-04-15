@@ -88,6 +88,14 @@ this.on('eventName', (data) => {
 this.broadcast('eventName', data);
 ```
 
+Alternatively, you can directly call methods on other modules:
+
+```javascript
+this.mods.loaded.otherModule.someMethod(data);
+```
+
+The only thing to remember here: you should never store a reference to modules (`this.mods.loaded.otherModule` in this example), because they will become stale after reload. 
+
 ### Timeout and Interval Management
 
 There are also wrappers for `setTimeout` and `setInterval` functions which are automatically cleared on module unload.
@@ -112,6 +120,10 @@ Modules should be placed in the `mods` directory and follow this structure:
 // mods/example.js
 module.exports = async function(ctx) {
   // Module initialization code, can be async
+
+  this.someMethod = () => {
+    // You can declare methods here to make them available from other modules
+  }
   
   // Return cleanup function
   return async () => {
