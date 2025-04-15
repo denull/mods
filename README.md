@@ -1,6 +1,6 @@
-# mods - Dynamic Module Management System
+# mods
 
-A powerful module management system for Node.js that provides dynamic loading, unloading, and hot-reloading capabilities for your application modules.
+Module management system for Node.js that provides dynamic loading, unloading, and hot-reloading capabilities for your application modules.
 
 ## Features
 
@@ -73,11 +73,13 @@ await mods.reload(null, ctx);
 
 ### Module Communication
 
+Each module is an `EventEmitter` instance, so you call use it for exchanging events between modules. All event listeners will be removed automatically when module unloads.
+
 ```javascript
 // Inside a module
 this.emit('eventName', data);
 
-// Listen for events from other modules
+// Listen for events
 this.on('eventName', (data) => {
   // Handle event
 });
@@ -87,6 +89,8 @@ this.broadcast('eventName', data);
 ```
 
 ### Timeout and Interval Management
+
+There is also a wrappers for `setTimeout` and `setInterval` which are automatically cleared on module unload.
 
 ```javascript
 // Set a timeout that will be automatically cleared on unload
@@ -106,8 +110,8 @@ Modules should be placed in the `mods` directory and follow this structure:
 
 ```javascript
 // mods/example.js
-module.exports = function(ctx) {
-  // Module initialization code
+module.exports = async function(ctx) {
+  // Module initialization code, can be async
   
   // Return cleanup function
   return async () => {
