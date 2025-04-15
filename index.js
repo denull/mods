@@ -70,7 +70,7 @@ class Mods {
       return Promise.all(name.map(mod => this.load(mod)));
     }
     const load = originalRequire(`${modsDir}/${name}`);
-    const mod = new Mod(this.loaded, name, ctx);
+    const mod = new Mod(this, name, ctx);
     this.loaded[name] = mod;
     mod.beforeUnload = load.call(mod, ctx); // We need to set the beforeUnload even before loading is complete (so the unload can work correctly)
     await mod.beforeUnload;
