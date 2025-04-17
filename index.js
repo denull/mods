@@ -50,12 +50,16 @@ class Mod extends EventEmitter {
     this.removeAllListeners();
     this.timeouts.forEach(timeout => clearTimeout(timeout));
     this.intervals.forEach(interval => clearInterval(interval));
-    this.beforeUnload && await this.beforeUnload();
+    const beforeUnload = await this.beforeUnload;
+    beforeUnload && await beforeUnload();
   }
 }
 
 class Mods {
-  constructor() {
+  constructor(mods, name, ctx) {
+    this.mods = mods;
+    this.name = name;
+    this.ctx = ctx;
     this.graph = {};
     this.loaded = {};
   }
@@ -79,7 +83,7 @@ class Mods {
 
   async unload(name, isReloading = false) {
     if (!name) {
-      Object.keys(this.loaded).forEach(mod => this.unload(mod, isReloading));
+      await Promise.all(Object.keys(this.loaded).map(mod => this.unload(mod, isReloading)));
       return;
     }
     if (Array.isArray(name)) {
@@ -93,21 +97,22 @@ class Mods {
     delete this.loaded[name];
   }
 
-  uncache(name) {
-    const filename = require.resolve(name, {
-      paths: [modsDir]
-    });
+  uncache(filename, uncached = {}) {
+    if (uncached[filename]) {
+      return;
+    }
+    uncached[filename] = true;
     delete require.cache[filename];
     if (this.graph[filename]) {
       this.graph[filename].requires.forEach(dependency => {
-        this.uncache(dependency);
+        this.uncache(dependency, uncached);
       });
     }
   }
 
   async reload(name, ctx) {
     if (!name) {
-      Object.keys(this.loaded).forEach(mod => this.reload(mod, ctx));
+      await Promise.all(Object.keys(this.loaded).map(mod => this.reload(mod, ctx)));
       return;
     }
     if (Array.isArray(name)) {
@@ -121,14 +126,17 @@ class Mods {
 }
 const mods = new Mods();
 
-Module.prototype.require = function(path) {
+Module.prototype.require = function(name) {
   if (!mods.graph[this.filename]) {
     mods.graph[this.filename] = {
       requires: new Set(),
     }
   }
-  mods.graph[this.filename].requires.add(path);
-  return originalRequire.call(this, path);
+  const filename = require.resolve(name, {
+    paths: [path.dirname(this.filename)]
+  });
+  mods.graph[this.filename].requires.add(name);
+  return originalRequire.call(this, filename);
 };
 
 /*Module._resolveFilename = function(request, parent, isMain, options) {
